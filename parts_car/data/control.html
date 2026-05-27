@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Control — Carro Futurista</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Orbitron', monospace;
+      background: radial-gradient(circle at top, #071228 0%, #05070f 45%, #0b1122 100%);
+      color: #e8f8ff;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 3rem 1.25rem 3.5rem; gap: 1.75rem;
+      position: relative; overflow: hidden; min-height: 100vh;
+    }
+
+    .bg-grid {
+      position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(0,220,255,0.06) 1px,transparent 1px),
+                        linear-gradient(90deg,rgba(0,220,255,0.06) 1px,transparent 1px);
+      background-size: 28px 28px; pointer-events: none; z-index: -1;
+    }
+
+    .bg-glow {
+      position: fixed; width: 620px; height: 420px; border-radius: 50%;
+      background: radial-gradient(circle at 40% 30%, rgba(0,255,170,0.15) 0%, transparent 55%),
+                  radial-gradient(circle at 70% 60%, rgba(120,0,255,0.12) 0%, transparent 50%);
+      top: 45%; left: 55%; transform: translate(-50%,-50%); pointer-events: none; z-index: -1;
+    }
+
+    .container {
+      position: relative; z-index: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 1.8rem; width: 100%; max-width: 860px;
+    }
+
+    /* BADGE */
+    .badge {
+      display: flex; align-items: center; gap: 12px; padding: 8px 20px;
+      border: 1px solid rgba(0,210,255,0.3); border-radius: 24px;
+      background: rgba(0,210,255,0.08);
+    }
+    .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff3a6e; transition: background 0.3s; }
+    .badge-dot.live { background: #00ffaa; }
+    .badge-txt { font-size: 10px; letter-spacing: 3px; color: rgba(225,255,255,0.95); }
+    .badge-status { font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.9); transition: color 0.3s; }
+    .badge-status.live { color: #b2ffdf; }
+
+    /* CONTROLLER SHELL */
+    .controller {
+      position: relative; width: 100%;
+      background: radial-gradient(circle at 20% 10%, rgba(0,230,255,0.12) 0%, transparent 40%),
+                  radial-gradient(circle at 80% 15%, rgba(255,90,180,0.08) 0%, transparent 35%), #0f1420;
+      border: 1px solid rgba(0,210,255,0.2);
+      border-radius: 44px 44px 66px 66px / 28px 28px 56px 56px;
+      padding: 40px 42px 50px;
+      display: flex; align-items: center; justify-content: space-between; gap: 22px;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.18);
+    }
+    .controller::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: radial-gradient(ellipse 100% 45% at 50% 0%, rgba(0,200,255,0.07) 0%, transparent 60%),
+                  radial-gradient(ellipse 70% 35% at 20% 100%, rgba(120,0,255,0.08) 0%, transparent 48%),
+                  radial-gradient(ellipse 70% 35% at 80% 100%, rgba(0,255,180,0.05) 0%, transparent 48%);
+      pointer-events: none;
+    }
+    .controller::after {
+      content: ''; position: absolute; top: 0; left: 18%; right: 18%; height: 1px;
+      background: linear-gradient(90deg, transparent 20%, rgba(0,210,255,0.45), transparent 80%);
+    }
+
+    /* Sections */
+    .section { display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; z-index: 1; }
+    .lbl { font-size: 10px; letter-spacing: 2.5px; color: rgba(220,255,255,0.98); text-align: center; text-shadow: 0 0 6px rgba(0,255,255,0.14); }
+
+    /* D-PAD */
+    .dpad { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(3, 54px); gap: 6px; }
+    .dp {
+      width: 54px; height: 54px;
+      background: linear-gradient(145deg, #111827, #141f33);
+      border: 1px solid rgba(0,210,255,0.18); border-radius: 14px;
+      color: rgba(0,210,255,0.55); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.14s; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .dp:hover { background: linear-gradient(145deg, #16263b, #0f1826); border-color: rgba(0,210,255,0.5); color: #7df1ff; }
+    .dp.active { background: #0a1e34; border-color: #00d2ff; color: #00f4ff; box-shadow: 0 0 0 1px rgba(0,210,255,0.25) inset, 0 4px 12px rgba(0,210,255,0.12); }
+    .dp-void { background: transparent; border: none; pointer-events: none; width: 54px; height: 54px; }
+    .dp-center { background: #0f1725; border: 1px solid rgba(0,210,255,0.12); border-radius: 14px; pointer-events: none; width: 54px; height: 54px; }
+
+    /* JOYSTICK */
+    .js-wrap {
+      width: 150px; height: 150px; border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(0,210,255,0.12), transparent 45%), #0c1016;
+      border: 1px solid rgba(0,210,255,0.24);
+      position: relative; cursor: crosshair; touch-action: none;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    .js-wrap::before { content: ''; position: absolute; inset: 12px; border-radius: 50%; border: 1px solid rgba(0,210,255,0.08); }
+    .js-wrap::after { content: ''; position: absolute; inset: 26px; border-radius: 50%; border: 1px solid rgba(0,210,255,0.06); }
+    .js-hline { position: absolute; width: 90px; height: 1px; background: rgba(0,210,255,0.1); pointer-events: none; }
+    .js-vline { position: absolute; width: 1px; height: 90px; background: rgba(0,210,255,0.1); pointer-events: none; }
+    .js-thumb {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 48px; height: 48px; border-radius: 50%;
+      background: linear-gradient(180deg, #152238, #0b1625);
+      border: 2px solid rgba(0,210,255,0.65);
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(0,210,255,0.8); font-size: 18px;
+      box-shadow: 0 5px 24px rgba(0,0,0,0.35);
+      transition: border-color 0.15s, color 0.15s;
+      pointer-events: none;
+    }
+    .js-thumb.mv { border-color: #00ffaa; color: #00ffaa; }
+
+    /* CENTER COLUMN */
+    .center {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      position: relative; z-index: 1; width: min(260px, 100%);
+    }
+
+    /* POWER BUTTON */
+    .pw-btn {
+      display: flex; align-items: center; gap: 14px;
+      background: linear-gradient(180deg, rgba(18,28,45,0.98), #0c1625);
+      border: 1px solid rgba(0,255,170,0.18); border-radius: 18px;
+      padding: 14px 18px; cursor: pointer; transition: transform 0.18s, border-color 0.18s, background 0.18s;
+      position: relative; overflow: hidden; width: 100%;
+    }
+    .pw-btn:hover { transform: translateY(-1px); }
+    .pw-btn::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(0,255,170,0.3), transparent); }
+    .pw-btn.on { border-color: rgba(0,255,170,0.55); background: linear-gradient(180deg, rgba(0,32,20,0.95), #08120f); animation: neonPulse 1.8s infinite alternate; }
+    .pw-btn.on::after { background: linear-gradient(90deg, transparent, rgba(0,255,170,0.55), transparent); }
+    .pw-ring { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid rgba(0,255,170,0.55); display: flex; align-items: center; justify-content: center; color: rgba(0,255,170,0.95); font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
+    .pw-btn.on .pw-ring { border-color: #00ffaa; color: #00ffaa; }
+    .pw-name { font-size: 11px; letter-spacing: 1.5px; color: rgba(255,255,255,0.98); }
+    .pw-btn.on .pw-name { color: #00ffaa; }
+    .pw-sub { font-size: 9px; letter-spacing: 1px; color: rgba(230,255,255,0.8); margin-top: 3px; }
+    .pw-btn.on .pw-sub { color: rgba(0,255,170,0.85); }
+
+    @keyframes neonPulse {
+      0%   { box-shadow: 0 0 10px rgba(0,255,170,0.2); }
+      100% { box-shadow: 0 0 30px rgba(0,255,170,0.55), inset 0 0 15px rgba(0,255,170,0.08); }
+    }
+
+    /* MODO */
+    .mode-row {
+      display: flex; align-items: center; gap: 10px;
+      background: linear-gradient(180deg, rgba(5,12,22,0.9), rgba(10,18,32,0.9));
+      border: 1px solid rgba(0,210,255,0.16); border-radius: 14px;
+      padding: 10px 14px; width: 100%;
+    }
+    .mode-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,90,180,0.65); transition: background 0.3s; flex-shrink: 0; }
+    .mode-dot.on { background: #00ffaa; }
+    .mode-lbl { font-size: 9px; letter-spacing: 1.8px; color: rgba(215,255,255,0.92); }
+
+    /* VELOCIDAD */
+    .vel-block {
+      background: radial-gradient(circle at 20% 20%, rgba(0,210,255,0.08), transparent 45%), #0f1520;
+      border: 1px solid rgba(0,210,255,0.16); border-radius: 16px;
+      padding: 14px 16px; position: relative; overflow: hidden; width: 100%;
+    }
+    .vel-block::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(0,210,255,0.4), transparent); }
+    .vel-lbl { font-size: 9px; letter-spacing: 2px; color: rgba(222,255,255,0.95); margin-bottom: 11px; }
+    .vel-btns { display: flex; gap: 8px; }
+    .vb {
+      flex: 1; padding: 10px 0; border-radius: 12px;
+      border: 1px solid rgba(0,210,255,0.18); background: #0a1321;
+      font-family: 'Orbitron', monospace; font-size: 11px; letter-spacing: 1.5px;
+      color: rgba(0,210,255,0.7); cursor: pointer; transition: all 0.15s;
+    }
+    .vb:hover:not(:disabled) { background: #13243d; border-color: rgba(0,210,255,0.5); color: #a6f9ff; }
+    .vb.on { background: #082138; border-color: #00d2ff; color: #00d2ff; }
+    .vb:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    /* HUD */
+    .hud {
+      width: 100%; max-width: 760px;
+      display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px;
+    }
+    .hud-cell {
+      background: linear-gradient(180deg, rgba(5,11,22,0.98), rgba(10,18,31,0.95));
+      border: 1px solid rgba(0,210,255,0.12); border-radius: 16px;
+      padding: 14px 12px; text-align: center;
+    }
+    .hud-k { font-size: 8px; letter-spacing: 2px; color: rgba(185,245,255,0.9); margin-bottom: 7px; }
+    .hud-v { font-size: 14px; font-weight: 600; color: rgba(210,245,255,0.95); transition: color 0.2s; }
+    .hud-v.hi { color: #79d4ff; }
+    .hud-v.go { color: #5dffcc; }
+
+    .back-link {
+      position: absolute; top: 20px; left: 20px;
+      color: rgba(180,245,255,0.9); text-decoration: none; font-size: 12px; letter-spacing: 1px;
+      transition: color 0.3s; z-index: 10;
+    }
+    .back-link:hover { color: #00d2ff; }
+
+    /* PRESET STATUS */
+    .preset-status {
+      font-size: 9px; letter-spacing: 1.5px; color: rgba(180,245,255,0.75);
+      text-align: center; margin-top: 4px;
+    }
+
+    @media (max-width: 720px) {
+      .controller { width: 100%; padding: 26px 18px 36px; flex-direction: column; align-items: center; }
+      .section, .center { width: 100%; }
+      .dpad { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 5px; }
+      .dp { font-size: 14px; width: 44px; height: 44px; border-radius: 12px; }
+      .dp-void, .dp-center { width: 44px; height: 44px; }
+      .js-wrap { width: 120px; height: 120px; }
+      .hud { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+  <a href="/index.html" class="back-link">← ATRÁS</a>
+
+  <div class="container">
+
+    <div class="badge">
+      <div class="badge-dot" id="bdot"></div>
+      <span class="badge-txt">CARRO ROBÓTICO ·</span>
+      <span class="badge-status" id="bstat">OFFLINE</span>
+    </div>
+
+    <div class="controller">
+
+      <!-- D-PAD -->
+      <div class="section">
+        <div class="lbl">CONTROL DIGITAL</div>
+        <div class="dpad">
+          <div class="dp-void"></div>
+          <div class="dp" id="dp-u">▲</div>
+          <div class="dp-void"></div>
+          <div class="dp" id="dp-l">◀</div>
+          <div class="dp-center"></div>
+          <div class="dp" id="dp-r">▶</div>
+          <div class="dp-void"></div>
+          <div class="dp" id="dp-d">▼</div>
+          <div class="dp-void"></div>
+        </div>
+      </div>
+
+      <!-- CENTRO -->
+      <div class="center">
+        <button class="pw-btn" id="pwbtn">
+          <div class="pw-ring">⏻</div>
+          <div>
+            <div class="pw-name">ENCENDER</div>
+            <div class="pw-sub" id="pwsub">INACTIVO</div>
+          </div>
+        </button>
+
+        <div class="vel-block">
+          <div class="vel-lbl">VELOCIDAD MANUAL</div>
+          <div class="vel-btns">
+            <button class="vb" id="v1" disabled>V·1</button>
+            <button class="vb" id="v2" disabled>V·2</button>
+            <button class="vb" id="v3" disabled>V·3</button>
+          </div>
+          <div class="preset-status" id="presetTxt">Preset: --</div>
+        </div>
+
+        <div class="mode-row">
+          <div class="mode-dot" id="mdot"></div>
+          <span class="mode-lbl" id="modetxt">MODO: MANUAL</span>
+        </div>
+      </div>
+
+      <!-- JOYSTICK -->
+      <div class="section">
+        <div class="lbl">JOYSTICK</div>
+        <div class="js-wrap" id="joystick">
+          <div class="js-hline"></div>
+          <div class="js-vline"></div>
+          <div class="js-thumb" id="jthumb">✚</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- HUD -->
+    <div class="hud">
+      <div class="hud-cell"><div class="hud-k">ESTADO</div><div class="hud-v" id="hd-st">OFF</div></div>
+      <div class="hud-cell"><div class="hud-k">DIRECCIÓN</div><div class="hud-v" id="hd-dir">—</div></div>
+      <div class="hud-cell"><div class="hud-k">VELOCIDAD</div><div class="hud-v" id="hd-vel">—</div></div>
+      <div class="hud-cell"><div class="hud-k">SEÑAL</div><div class="hud-v" id="hd-sig">—</div></div>
+    </div>
+
+  </div>
+
+<script>
+/* ── CONSTANTES ──────────────────────────────── */
+const MAX_R = 40;
+const VEL_LABELS = { 1:'30%', 2:'60%', 3:'90%' };
+
+// Velocidad real enviada al carro según preset (0 = sin preset, usa valor por defecto)
+const VEL_POR_PRESET = { 0: 102, 1: 77, 2: 153, 3: 230 };
+
+function getVelActual() {
+  return VEL_POR_PRESET[selectedPresetLevel] ?? 102;
+}
+
+/* ── ESTADO ──────────────────────────────────── */
+let encendido = false;
+let modoActual = 'manual';
+let lastCommand = 'stop';
+let ultimoEnvio = 0;
+let jActive = false;
+let toqueActivo = false;
+let selectedPresetLevel = 0;
+
+/* ── ELEMENTOS ───────────────────────────────── */
+const bdot     = document.getElementById('bdot');
+const bstat    = document.getElementById('bstat');
+const pwbtn    = document.getElementById('pwbtn');
+const pwsub    = document.getElementById('pwsub');
+const mdot     = document.getElementById('mdot');
+const modetxt  = document.getElementById('modetxt');
+const presetTxt= document.getElementById('presetTxt');
+const hdSt     = document.getElementById('hd-st');
+const hdDir    = document.getElementById('hd-dir');
+const hdVel    = document.getElementById('hd-vel');
+const hdSig    = document.getElementById('hd-sig');
+const jsEl     = document.getElementById('joystick');
+const jthumb   = document.getElementById('jthumb');
+const vbs      = [document.getElementById('v1'), document.getElementById('v2'), document.getElementById('v3')];
+
+const dpEls = {
+  u: document.getElementById('dp-u'),
+  d: document.getElementById('dp-d'),
+  l: document.getElementById('dp-l'),
+  r: document.getElementById('dp-r'),
+};
+const dmap = { u:'backward', d:'forward', l:'right', r:'left' };
+
+/* ── COMUNICACIÓN ────────────────────────────── */
+function enviarMovimiento(cmd, vel = 0) {
+  const ahora = Date.now();
+  if (!encendido) return;
+  if (modoActual !== 'manual') return;
+  if (cmd === lastCommand && ahora - ultimoEnvio < 150) return;
+  lastCommand = cmd;
+  ultimoEnvio = ahora;
+  fetch(`/${cmd}?vel=${vel}`).catch(console.error);
+}
+
+/* ── UI ──────────────────────────────────────── */
+function setDir(cmd) {
+  const lbl = { forward:'ADELANTE', backward:'ATRÁS', left:'IZQUIERDA', right:'DERECHA', stop:'—' };
+  hdDir.textContent = lbl[cmd] || '—';
+  hdDir.className = 'hud-v' + (cmd && cmd !== 'stop' ? ' hi' : '');
+  Object.entries(dpEls).forEach(([k, b]) => {
+    b.classList.toggle('active', dmap[k] === cmd);
+  });
+}
+
+function detener() {
+  if (lastCommand !== 'stop') {
+    fetch('/stop').catch(() => {});
+    lastCommand = 'stop';
+  }
+  setDir('stop');
+  jthumb.classList.remove('mv');
+  jthumb.style.left = '50%';
+  jthumb.style.top  = '50%';
+  jthumb.style.transform = 'translate(-50%,-50%)';
+}
+
+function actualizarUIdeModo() {
+  modetxt.textContent = `MODO: ${modoActual.toUpperCase()}`;
+  mdot.classList.toggle('on', encendido);
+  const esManual = modoActual === 'manual';
+  vbs.forEach(b => {
+    b.disabled = !encendido || !esManual;
+  });
+}
+
+function actualizarPresetUI(level) {
+  selectedPresetLevel = level;
+  vbs.forEach((b, i) => b.classList.toggle('on', i === level - 1));
+  presetTxt.textContent = level >= 1 && level <= 3
+    ? `Preset: ${level} (${VEL_LABELS[level]})`
+    : 'Preset: --';
+  hdVel.textContent = level >= 1 ? VEL_LABELS[level] : '—';
+  hdVel.className   = 'hud-v' + (level >= 1 ? ' hi' : '');
+}
+
+/* ── MODO ────────────────────────────────────── */
+async function obtenerModo() {
+  try {
+    const res = await fetch('/getMode');
+    if (!res.ok) return modoActual;
+    const txt = (await res.text()).trim().toLowerCase();
+    if (['manual', 'autonomo'].includes(txt)) modoActual = txt;
+    return modoActual;
+  } catch (err) {
+    console.error(err);
+    return modoActual;
+  }
+}
+
+async function actualizarVelActual() {
+  try {
+    const res = await fetch('/getVelocidad');
+    if (!res.ok) return;
+    const data = await res.json();
+    hdVel.textContent = data.velocidad + '%';
+    hdVel.className = 'hud-v hi';
+  } catch {}
+}
+
+async function refrescarTodo() {
+  await obtenerModo();
+  actualizarUIdeModo();
+  await actualizarVelActual();
+}
+
+/* ── POWER ───────────────────────────────────── */
+async function togglePower() {
+  await obtenerModo();
+  if (modoActual !== 'manual') {
+    alert('⚠️ Cambia a MODO MANUAL para usar el control.');
+    return;
+  }
+  encendido = !encendido;
+  pwbtn.classList.toggle('on', encendido);
+  bdot.classList.toggle('live', encendido);
+  bstat.classList.toggle('live', encendido);
+  bstat.textContent = encendido ? 'ONLINE' : 'OFFLINE';
+  pwsub.textContent = encendido ? 'ACTIVO' : 'INACTIVO';
+  hdSt.textContent  = encendido ? 'ON' : 'OFF';
+  hdSt.className    = 'hud-v' + (encendido ? ' go' : '');
+  hdSig.textContent = encendido ? '100%' : '—';
+  hdSig.className   = 'hud-v' + (encendido ? ' go' : '');
+
+  actualizarUIdeModo();
+
+  if (!encendido) {
+    detener();
+    actualizarPresetUI(0);
+  }
+
+  fetch(`/toggleControl?state=${encendido ? 'on' : 'off'}`).catch(console.error);
+}
+
+/* Prevenir doble tap en móvil */
+pwbtn.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (toqueActivo) return;
+  toqueActivo = true;
+  togglePower();
+  setTimeout(() => (toqueActivo = false), 400);
+}, { passive: false });
+
+pwbtn.addEventListener('click', e => {
+  e.preventDefault();
+  if (toqueActivo) return;
+  togglePower();
+});
+
+/* ── VELOCIDAD ───────────────────────────────── */
+function applyVel(lvl) {
+  if (!encendido || modoActual !== 'manual') return;
+  vbs.forEach(b => b.disabled = true);
+  fetch(`/setSpeedLevel?mode=manual&level=${lvl}`)
+    .then(res => {
+      if (res.status === 429) alert('Cambio de velocidad muy rápido, espera.');
+      else actualizarPresetUI(lvl);
+    })
+    .catch(console.error)
+    .finally(() => {
+      setTimeout(() => vbs.forEach(b => b.disabled = !encendido), 800);
+      actualizarVelActual();
+    });
+}
+
+vbs.forEach((b, i) => b.addEventListener('click', () => applyVel(i + 1)));
+
+/* ── D-PAD ───────────────────────────────────── */
+Object.entries(dpEls).forEach(([k, b]) => {
+  const cmd = dmap[k];
+
+  b.addEventListener('mousedown', () => {
+    if (!encendido) return;
+    setDir(cmd);
+    enviarMovimiento(cmd, getVelActual());
+  });
+  b.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (!encendido) return;
+    setDir(cmd);
+    enviarMovimiento(cmd, getVelActual());
+  }, { passive: false });
+
+  b.addEventListener('mouseup',    detener);
+  b.addEventListener('mouseleave', detener);
+  b.addEventListener('touchend',   detener, { passive: false });
+});
+
+/* ── TECLADO ─────────────────────────────────── */
+const keyMap = {
+  ArrowUp:'backward', w:'backward',
+  ArrowDown:'forward', s:'forward',
+  ArrowLeft:'right', a:'right',
+  ArrowRight:'left', d:'left',
+};
+
+window.addEventListener('keydown', e => {
+  if (!encendido) return;
+  const cmd = keyMap[e.key];
+  if (!cmd) return;
+  e.preventDefault();
+  setDir(cmd);
+  enviarMovimiento(cmd, getVelActual());
+});
+
+window.addEventListener('keyup', e => {
+  if (Object.keys(keyMap).includes(e.key)) detener();
+});
+
+window.addEventListener('blur', detener);
+
+/* ── JOYSTICK ────────────────────────────────── */
+function moveThumb(cx, cy) {
+  const rect = jsEl.getBoundingClientRect();
+  const ox = cx - rect.left - rect.width / 2;
+  const oy = cy - rect.top  - rect.height / 2;
+  const dist = Math.min(MAX_R, Math.hypot(ox, oy));
+  const ang  = Math.atan2(oy, ox);
+  const tx   = dist * Math.cos(ang);
+  const ty   = dist * Math.sin(ang);
+
+  jthumb.style.left = `calc(50% + ${tx}px)`;
+  jthumb.style.top  = `calc(50% + ${ty}px)`;
+  jthumb.style.transform = 'translate(-50%,-50%)';
+
+  if (!encendido) return;
+
+  let cmd = 'stop';
+  if      (ty < -15) cmd = 'backward';
+  else if (ty >  15) cmd = 'forward';
+  else if (tx < -15) cmd = 'right';
+  else if (tx >  15) cmd = 'left';
+
+  jthumb.classList.toggle('mv', cmd !== 'stop');
+  setDir(cmd);
+
+  if (cmd === 'stop') { detener(); return; }
+  enviarMovimiento(cmd, getVelActual());
+}
+
+jsEl.addEventListener('mousedown', e => { jActive = true; moveThumb(e.clientX, e.clientY); });
+window.addEventListener('mousemove', e => { if (jActive) requestAnimationFrame(() => moveThumb(e.clientX, e.clientY)); });
+window.addEventListener('mouseup', () => { if (jActive) { jActive = false; detener(); } });
+
+jsEl.addEventListener('touchstart', e => {
+  e.preventDefault();
+  jActive = true;
+  moveThumb(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+
+window.addEventListener('touchmove', e => {
+  if (!jActive) return;
+  e.preventDefault();
+  requestAnimationFrame(() => moveThumb(e.touches[0].clientX, e.touches[0].clientY));
+}, { passive: false });
+
+window.addEventListener('touchend', () => { if (jActive) { jActive = false; detener(); } });
+
+/* ── ARRANQUE ────────────────────────────────── */
+refrescarTodo();
+setInterval(refrescarTodo, 2500);
+</script>
+</body>
+</html>
